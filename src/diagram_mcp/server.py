@@ -167,24 +167,21 @@ async def stdio_main():
         await server.run(read_stream, write_stream, server.create_initialization_options())
 
 def create_app():
-    app = Starlette(debug=True)
+    from fastapi import FastAPI, Request
+    from starlette.routing import Mount
+
+    app = FastAPI(title="Diagram MCP SSE Server")
     transport = SseServerTransport("/messages")
 
-    from starlette.routing import Mount, Route
+    app.router.routes.append(Mount("/messages", app=transport.handle_post_message))
 
-    async def handle_sse(request):
+    @app.get("/sse")
+    async def handle_sse(request: Request):
         async with transport.connect_sse(
             request.scope, request.receive, request._send
         ) as (read_stream, write_stream):
             await server.run(read_stream, write_stream, server.create_initialization_options())
 
-    app = Starlette(
-        debug=True,
-        routes=[
-            Route("/sse", endpoint=handle_sse),
-            Mount("/messages", app=transport.handle_post_message),
-        ]
-    )
     return app
 
 if __name__ == "__main__":
