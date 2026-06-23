@@ -170,17 +170,21 @@ def create_app():
     app = Starlette(debug=True)
     transport = SseServerTransport("/messages")
 
+    from starlette.routing import Mount, Route
+
     async def handle_sse(request):
         async with transport.connect_sse(
             request.scope, request.receive, request._send
         ) as (read_stream, write_stream):
             await server.run(read_stream, write_stream, server.create_initialization_options())
 
-    async def handle_messages(request):
-        await transport.handle_post_message(request.scope, request.receive, request._send)
-
-    app.add_route("/sse", handle_sse, methods=["GET"])
-    app.add_route("/messages", handle_messages, methods=["POST"])
+    app = Starlette(
+        debug=True,
+        routes=[
+            Route("/sse", endpoint=handle_sse),
+            Mount("/messages", app=transport.handle_post_message),
+        ]
+    )
     return app
 
 if __name__ == "__main__":
